@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-16"?>
+<!-- Generated with EZOut 1.8.3.1: Install-Module EZOut or https://github.com/StartAutomating/EZOut -->
+<Types>
+  <Type>
+    <Name>Roku.App</Name>
+    <Members>
+      <AliasProperty>
+        <Name>Name</Name>
+        <ReferencedMemberName>#text</ReferencedMemberName>
+      </AliasProperty>
+      <AliasProperty>
+        <Name>RokuAppID</Name>
+        <ReferencedMemberName>id</ReferencedMemberName>
+      </AliasProperty>
+    </Members>
+  </Type>
+</Types>

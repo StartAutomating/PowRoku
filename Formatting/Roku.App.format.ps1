@@ -1,0 +1,1 @@
+﻿Write-FormatView -TypeName Roku.App -Property Name, Version, Type, RokuAppID

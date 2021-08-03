@@ -1,0 +1,4 @@
+﻿@{
+    RokuAppID = 'id'
+    Name = '#text'
+}

@@ -17,12 +17,12 @@
     [CmdletBinding(SupportsShouldProcess,ConfirmImpact='Low',DefaultParameterSetName='Command')]
     [OutputType([xml], [Nullable])]
     param(
-    # The IP Address of the NanoLeaf.
-    [Parameter(Mandatory,ValueFromPipelineByPropertyName)]
-    [IPAddress]
+    # The IP Address of the Roku.
+    [Parameter(ValueFromPipelineByPropertyName)]
+    [IPAddress[]]
     $IPAddress,
 
-    # The URI fragment to send to the nanoleaf.
+    # The URI fragment to send to the Roku.
     [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='Command')]
     [string]
     $Command,
@@ -57,6 +57,21 @@
     [PSObject]
     $Data,
 
+    # If set, will attempt to mute the device.
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='VolumeMute')]
+    [switch]
+    $Mute,
+
+    # If set, will raise the volume.
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='VolumeUp')]
+    [switch]
+    $VolumeUp,
+
+    # If set, will lower the volume.
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='VolumeDown')]
+    [switch]
+    $VolumeDown,
+
     # A set of additional properties to add to an object
     [Parameter(ValueFromPipelineByPropertyName)]
     [Collections.IDictionary]
@@ -78,137 +93,153 @@
 
     process {
         #region Broadcast Recursively if no -IPAddress was provided
-        if ($IPAddress -in [IPAddress]::Any,[IPAddress]::Broadcast) {
-            $splat = @{} + $PsBoundParameters
-            $splat.Remove('IPAddress')
-            foreach ($val in $Script:RokuCache.Values) {
-                $splat['IPAddress'] = $val.IPAddress
-                Send-Roku @splat
+        if (-not $IPAddress -or 
+            $IPAddress -eq [IPAddress]::Broadcast -or 
+            $IPAddress -eq [IPAddress]::Any
+        ) {
+            if (-not $script:CachedDiscoveredRokus) {
+                Find-Roku | Out-Null
             }
-            return
-        }
-        #endregion Broadcast Recursively if no -IPAddress was provided
-
-
-        if ($PSCmdlet.ParameterSetName -eq 'Text') {
-            foreach ($char in $text.ToCharArray()) {
-                $u = [Web.HttpUtility]::UrlEncode("$char")
-                Send-Roku -Command "keypress/Lit_$u" -IPAddress $IPAddress -Method POST -Data ''  |
-                & { process {
-                    if ($WhatIfPreference)  {$_ }
-                } }
-            }
-            return
-        }
-
-        if ($PSCmdlet.ParameterSetName -like 'key*') {
-            $key = $KeyDown, $KeyUp, $KeyPress -ne ''
-
-            Send-Roku -Command "$($PSCmdlet.ParameterSetName)/$key" -IPAddress $IPAddress -Method POST -Data '' |
-                & { process {
-                    if ($WhatIfPreference)  {$_ }
-                } }
-
-            return
-        }
-
-        $splat = @{
-            uri = "http://${IPAddress}:8060/$Command"
-            method = $Method
-        }
-
-        if ($Data) {
-            if ($data -is [string]){
-                $splat.body = $data
+            if ($script:CachedDiscoveredRokus) {
+                $IPAddress = $script:CachedDiscoveredRokus | Select-Object -ExpandProperty IPAddress
             } else {
-                $splat.body = ConvertTo-Json -Compress -Depth 10 -InputObject $Data
+                Write-Error "No Rokus found"
+                return
             }
         }
+        $psParameterSet = $PSCmdlet.ParameterSetName
 
-        if ($WhatIfPreference) {
-            return $splat
-        }
+        foreach ($ip in $ipaddress) {
+            if ($psParameterSet -eq 'Text') {
+                foreach ($char in $text.ToCharArray()) {
+                    $u = [Web.HttpUtility]::UrlEncode("$char")
+                    Send-Roku -Command "keypress/Lit_$u" -IPAddress $ip -Method POST -Data ''  |
+                    & { process {
+                        if ($WhatIfPreference)  {$_ }
+                    } }
+                }
+                continue
+            }
 
-        if (-not $property) { $property = [Ordered]@{}  }
-        $property['IPAddress'] = $IPAddress
+            if ($psParameterSet -like "Volume*") {                
+                $KeyPress = "$psParameterSet"
+                $psParameterSet = 'keypress'
+            }
 
+            if ($psParameterSet -like 'key*') {
+                $key = $KeyDown, $KeyUp, $KeyPress -ne ''
 
-        $psProperties = @(
-            foreach ($propKeyValue in $Property.GetEnumerator()) {
-                if ($propKeyValue.Value -as [ScriptBlock[]]) {
-                    [PSScriptProperty]::new.Invoke(@($propKeyValue.Key) + $propKeyValue.Value)
+                Send-Roku -Command "$psParameterSet/$key" -IPAddress $ip -Method POST -Data '' |
+                    & { process {
+                        if ($WhatIfPreference)  {$_ }
+                    } }
+
+                continue
+            }
+
+            $splat = @{
+                uri = "http://${ip}:8060/$Command"
+                method = $Method
+            }
+
+            if ($Data) {
+                if ($data -is [string]){
+                    $splat.body = $data
                 } else {
-                    [PSNoteProperty]::new($propKeyValue.Key, $propKeyValue.Value)
+                    $splat.body = ConvertTo-Json -Compress -Depth 10 -InputObject $Data
                 }
             }
-        )
 
-        if (! $PSCmdlet.ShouldProcess("$Method $($splat.Uri)")) { return }
+            if ($WhatIfPreference) {
+                $splat
+                continue
+            }
 
-        Invoke-RestMethod @splat 2>&1 |
-             & { process {
-                $in = $_
-                if ($in -isnot [xml]) {
-                    $inXml = $in -as [xml]
-                    if ($inXml) {
-                        $in = $inXml
+            if (-not $property) { $property = [Ordered]@{}  }
+            $property['IPAddress'] = $ip
+
+
+            $psProperties = @(
+                foreach ($propKeyValue in $Property.GetEnumerator()) {
+                    if ($propKeyValue.Value -as [ScriptBlock[]]) {
+                        [PSScriptProperty]::new.Invoke(@($propKeyValue.Key) + $propKeyValue.Value)
+                    } else {
+                        [PSNoteProperty]::new($propKeyValue.Key, $propKeyValue.Value)
                     }
                 }
+            )
+
+            if (! $PSCmdlet.ShouldProcess("$Method $($splat.Uri)")) { return }
+
+            Invoke-RestMethod @splat 2>&1 |
+                 & { process {
+                    $in = $_
+                    if ($in -isnot [xml]) {
+                        $inXml = $in -as [xml]
+                        if ($inXml) {
+                            $in = $inXml
+                        }
+                    }
 
 
-                if (-not $in -or $in -eq 'null') { return }
-                if ($ExpandProperty) {
-                    if ($in.$ExpandProperty) {
-                        $in.$ExpandProperty
+                    if (-not $in -or $in -eq 'null') { return }
+                    if ($ExpandProperty) {
+                        if ($in.$ExpandProperty) {
+                            $in.$ExpandProperty
+                        }
+                    } else {
+                        $in # pass it down the pipe.
                     }
-                } else {
-                    $in # pass it down the pipe.
-                }
-            } } 2>&1 |
-            & { process { # One more step of the pipeline will unroll each of the values.
+                } } 2>&1 |
+                & { process { # One more step of the pipeline will unroll each of the values.
 
-                if ($_ -is [string]) { return $_ }
-                if ($null -ne $_.Count -and $_.Count -eq 0) { return }
-                $in = $_
-                if ($PSTypeName -and # If we have a PSTypeName (to apply formatting)
-                    $in -isnot [Management.Automation.ErrorRecord] # and it is not an error (which we do not want to format)
-                ) {
-                    $in.PSTypeNames.Clear() # then clear the existing typenames and decorate the object.
-                    foreach ($t in $PSTypeName) {
-                        $in.PSTypeNames.add($T)
+                    if ($_ -is [string]) { return $_ }
+                    if ($null -ne $_.Count -and $_.Count -eq 0) { return }
+                    $in = $_
+                    if ($PSTypeName -and # If we have a PSTypeName (to apply formatting)
+                        $in -isnot [Management.Automation.ErrorRecord] # and it is not an error (which we do not want to format)
+                    ) {
+                        $in.PSTypeNames.Clear() # then clear the existing typenames and decorate the object.
+                        foreach ($t in $PSTypeName) {
+                            $in.PSTypeNames.add($T)
+                        }
                     }
-                }
 
-                if ($Property -and $Property.Count) {
-                    foreach ($prop in $psProperties) {
-                        $in.PSObject.Members.Add($prop, $true)
+                    if ($Property -and $Property.Count) {
+                        foreach ($prop in $psProperties) {
+                            $in.PSObject.Members.Add($prop, $true)
+                        }
                     }
-                }
-                if ($RemoveProperty) {
-                    foreach ($propToRemove in $RemoveProperty) {
-                        $in.PSObject.Properties.Remove($propToRemove)
+                    if ($RemoveProperty) {
+                        foreach ($propToRemove in $RemoveProperty) {
+                            $in.PSObject.Properties.Remove($propToRemove)
+                        }
                     }
-                }
-                if ($DecorateProperty) {
-                    foreach ($kv in $DecorateProperty.GetEnumerator()) {
-                        if ($in.$($kv.Key)) {
-                            foreach ($v in $in.$($kv.Key)) {
-                                if ($null -eq $v -or -not $v.pstypenames) { continue }
-                                $v.pstypenames.clear()
-                                foreach ($tn in $kv.Value) {
-                                    $v.pstypenames.add($tn)
+                    if ($DecorateProperty) {
+                        foreach ($kv in $DecorateProperty.GetEnumerator()) {
+                            if ($in.$($kv.Key)) {
+                                foreach ($v in $in.$($kv.Key)) {
+                                    if ($null -eq $v -or -not $v.pstypenames) { continue }
+                                    $v.pstypenames.clear()
+                                    foreach ($tn in $kv.Value) {
+                                        $v.pstypenames.add($tn)
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                return $in # output the object and we're done.
-            } }
-        foreach ($ir in $invokeResult) {
+                    return $in # output the object and we're done.
+                } }
+            foreach ($ir in $invokeResult) {
 
-            $ir.psobject.properties.add($ipNoteProperty)
-            $ir
+                $ir.psobject.properties.add($ipNoteProperty)
+                $ir
+            }        
+            
         }
+
+
+        
     }
 }
 

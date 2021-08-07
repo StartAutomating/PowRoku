@@ -1,5 +1,5 @@
 ﻿@{
-    ModuleVersion = '0.1'
+    ModuleVersion = '0.2'
     RootModule = 'PowRoku.psm1'
     TypesToProcess = 'PowRoku.types.ps1xml'
     FormatsToProcess = 'PowRoku.format.ps1xml'

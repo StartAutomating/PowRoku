@@ -17,9 +17,9 @@
     [CmdletBinding(DefaultParameterSetName='query/device-info')]
     [OutputType([PSObject])]
     param(
-    # The IP Address of the Roku
-    [Parameter(Mandatory,ValueFromPipelineByPropertyName)]
-    [IPAddress]
+    # The IP Address of the Roku.  If not provided, all discovered rokus will be contacted.
+    [Parameter(ValueFromPipelineByPropertyName)]
+    [IPAddress[]]
     $IPAddress,
 
     # If set, will get device information about the Roku.
@@ -85,44 +85,59 @@
         $isQuery, $thingWeQuery = $PSCmdlet.ParameterSetName -split '/'
         if ($isQuery -eq 'query' -and $thingWeQuery) {
             #region Querying for Data
-            $queryData = Send-Roku -IPAddress $IPAddress -Command $PSCmdlet.ParameterSetName
-            switch ($thingWeQuery) {
-                'apps' {
-                    $queryData |
-                        Select-Object -ExpandProperty Apps |
-                        Select-Object -ExpandProperty App |
-                        decorate Roku.App
+            if (-not $IPAddress -or 
+                $IPAddress -eq [IPAddress]::Broadcast) {
+                if (-not $script:CachedDiscoveredRokus) {
+                    Find-Roku | Out-Null
                 }
-                'screensavers' {
-                    $queryData |
-                        Select-Object -ExpandProperty Screensavers |
-                        Select-Object -ExpandProperty Screensaver |
-                        decorate Roku.Screensaver, Roku.App
+                if ($script:CachedDiscoveredRokus) {
+                    $IPAddress = $script:CachedDiscoveredRokus | Select-Object -ExpandProperty IPAddress
+                } else {
+                    Write-Error "No Rokus found"
+                    return
                 }
-                'media-player' {
-                    $queryData |
-                        Select-Object -ExpandProperty Player |
-                        decorate "Roku.MediaPlayer"
-                }
-                'tv-channels' {
-                    $queryData |
-                        Select-Object -ExpandProperty tv-channels |
-                        Select-Object -ExpandProperty channel |
-                        decorate "Roku.TV.Channel"
-                }
-                'device-info' {
-                    $queryData |
-                        Select-Object -ExpandProperty device-info |
-                        Add-Member NoteProperty IPAddress $IPAddress -Force -PassThru |
-                        decorate $(
-                            if ($DeviceInfo) {
-                                "Roku.Device"
-                            } else {
-                                "Roku.Device#Basic", "Roku.Device"
-                            })
-                }
-                default {
-                    $queryData
+            }
+            
+            foreach ($ip in $IPAddress) {
+                $queryData = Send-Roku -IPAddress $ip -Command $PSCmdlet.ParameterSetName
+                switch ($thingWeQuery) {
+                    'apps' {
+                        $queryData |
+                            Select-Object -ExpandProperty Apps |
+                            Select-Object -ExpandProperty App |
+                            decorate Roku.App
+                    }
+                    'screensavers' {
+                        $queryData |
+                            Select-Object -ExpandProperty Screensavers |
+                            Select-Object -ExpandProperty Screensaver |
+                            decorate Roku.Screensaver, Roku.App
+                    }
+                    'media-player' {
+                        $queryData |
+                            Select-Object -ExpandProperty Player |
+                            decorate "Roku.MediaPlayer"
+                    }
+                    'tv-channels' {
+                        $queryData |
+                            Select-Object -ExpandProperty tv-channels |
+                            Select-Object -ExpandProperty channel |
+                            decorate "Roku.TV.Channel"
+                    }
+                    'device-info' {
+                        $queryData |
+                            Select-Object -ExpandProperty device-info |
+                            Add-Member NoteProperty IPAddress $IPAddress -Force -PassThru |
+                            decorate $(
+                                if ($DeviceInfo) {
+                                    "Roku.Device"
+                                } else {
+                                    "Roku.Device#Basic", "Roku.Device"
+                                })
+                    }
+                    default {
+                        $queryData
+                    }
                 }
             }
             #endregion Querying for Data

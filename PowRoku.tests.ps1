@@ -30,4 +30,9 @@ describe "PowRoku" {
         $whatIf[0].Uri |Should -BeLike */keypress/Lit_R
         $whatIf[5].Uri |Should -BeLike */keypress/Lit_%26
     }
+
+    it 'Can change the channel' {
+        $whatIf = Send-Roku -IPAddress ([IPAddress]::Loopback) -Channel 42
+        $whatIf.URI | Should -BeLike */launch/tvinput.dtv?ch=42
+    }
 }

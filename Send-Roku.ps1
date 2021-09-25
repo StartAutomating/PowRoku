@@ -72,6 +72,27 @@
     [switch]
     $VolumeDown,
 
+    # If set, will switch to the TV tuner
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='launch/tvinput.dtv')]
+    [switch]
+    $TVTuner,
+
+    # If provided, will change the channel on the TV Tuner.
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='launch/tvinput.dtv')]
+    [double]
+    $Channel,
+
+    # If provided, will change the TV Tuner to a given HDMI input.
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='launch/tvinput')]
+    [ValidateRange(1,10)]
+    [uint32]
+    $HDMIInput,
+
+    # If set, will change the Roku TV to use it's AV input
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='launch/tvinput')]
+    [switch]
+    $AVInput,
+
     # A set of additional properties to add to an object
     [Parameter(ValueFromPipelineByPropertyName)]
     [Collections.IDictionary]
@@ -136,6 +157,32 @@
 
                 continue
             }
+
+            if ($TVTuner -or $Channel) {
+                Send-Roku -Command "$psParameterSet$(if ($Channel) {"?ch=$($channel)"})" -IPAddress $ip -Method POST -Data '' |
+                    & { process {
+                        if ($WhatIfPreference)  {$_ }
+                    } }
+                continue
+            }
+
+            if ($psParameterSet -eq 'launch/tvinput') {
+                $command = "$psParameterSet"
+
+                if ($AVInput) {
+                    $Command += ".cvbs"
+                } else {
+                    $Command += ".hdmi$($HDMIInput)"
+                }
+                Send-Roku -Command $Command -IPAddress $ip -Method POST -Data '' |
+                    & { process {
+                        if ($WhatIfPreference)  {$_ }
+                    } }
+                continue
+            }
+
+            
+
 
             $splat = @{
                 uri = "http://${ip}:8060/$Command"

@@ -114,8 +114,8 @@
 
     process {
         #region Broadcast Recursively if no -IPAddress was provided
-        if (-not $IPAddress -or 
-            $IPAddress -eq [IPAddress]::Broadcast -or 
+        if (-not $IPAddress -or
+            $IPAddress -eq [IPAddress]::Broadcast -or
             $IPAddress -eq [IPAddress]::Any
         ) {
             if (-not $script:CachedDiscoveredRokus) {
@@ -130,7 +130,7 @@
         }
         $psParameterSet = $PSCmdlet.ParameterSetName
 
-        foreach ($ip in $ipaddress) {
+        :nextIPAddress foreach ($ip in $ipaddress) {
             if ($psParameterSet -eq 'Text') {
                 foreach ($char in $text.ToCharArray()) {
                     $u = [Web.HttpUtility]::UrlEncode("$char")
@@ -139,10 +139,10 @@
                         if ($WhatIfPreference)  {$_ }
                     } }
                 }
-                continue
+                continue nextIPAddress
             }
 
-            if ($psParameterSet -like "Volume*") {                
+            if ($psParameterSet -like "Volume*") {
                 $KeyPress = "$psParameterSet"
                 $psParameterSet = 'keypress'
             }
@@ -155,7 +155,7 @@
                         if ($WhatIfPreference)  {$_ }
                     } }
 
-                continue
+                continue nextIPAddress
             }
 
             if ($TVTuner -or $Channel) {
@@ -163,7 +163,7 @@
                     & { process {
                         if ($WhatIfPreference)  {$_ }
                     } }
-                continue
+                continue nextIPAddress
             }
 
             if ($psParameterSet -eq 'launch/tvinput') {
@@ -178,10 +178,10 @@
                     & { process {
                         if ($WhatIfPreference)  {$_ }
                     } }
-                continue
+                continue nextIPAddress
             }
 
-            
+
 
 
             $splat = @{
@@ -199,7 +199,7 @@
 
             if ($WhatIfPreference) {
                 $splat
-                continue
+                continue nextIPAddress
             }
 
             if (-not $property) { $property = [Ordered]@{}  }
@@ -217,7 +217,7 @@
             )
 
             if (! $PSCmdlet.ShouldProcess("$Method $($splat.Uri)")) { continue }
-            if ($WhatIfPreference) { continue } 
+            if ($WhatIfPreference) { continue nextIPAddress }
             Invoke-RestMethod @splat 2>&1 |
                  & { process {
                     $in = $_
@@ -281,12 +281,12 @@
 
                 $ir.psobject.properties.add($ipNoteProperty)
                 $ir
-            }        
-            
+            }
+
         }
 
 
-        
+
     }
 }
 

@@ -216,8 +216,8 @@
                 }
             )
 
-            if (! $PSCmdlet.ShouldProcess("$Method $($splat.Uri)")) { return }
-
+            if (! $PSCmdlet.ShouldProcess("$Method $($splat.Uri)")) { continue }
+            if ($WhatIfPreference) { continue } 
             Invoke-RestMethod @splat 2>&1 |
                  & { process {
                     $in = $_

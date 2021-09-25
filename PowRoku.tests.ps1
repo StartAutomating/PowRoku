@@ -32,12 +32,12 @@ describe "PowRoku" {
     }
 
     it 'Can change the channel' {
-        $whatIf = Send-Roku -IPAddress 1.2.3.4 -Channel 42
+        $whatIf = Send-Roku -IPAddress 1.2.3.4 -Channel 42 -WhatIf
         $whatIf.URI | Should -BeLike */launch/tvinput.dtv?ch=42
     }
 
     it 'Can switch to HDMI' {
-        $whatIf = Send-Roku -IPAddress 1.2.3.4 -HDMIInput 1
+        $whatIf = Send-Roku -IPAddress 1.2.3.4 -HDMIInput 1 -WhatIf
         $whatIf.URI | Should -BeLike */launch/tvinput.hdmi1
     }
 }

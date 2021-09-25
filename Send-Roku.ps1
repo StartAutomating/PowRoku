@@ -72,6 +72,27 @@
     [switch]
     $VolumeDown,
 
+    # If set, will switch to the TV tuner
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='launch/tvinput.dtv')]
+    [switch]
+    $TVTuner,
+
+    # If provided, will change the channel on the TV Tuner.
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='launch/tvinput.dtv')]
+    [double]
+    $Channel,
+
+    # If provided, will change the TV Tuner to a given HDMI input.
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='launch/tvinput')]
+    [ValidateRange(1,10)]
+    [uint32]
+    $HDMIInput,
+
+    # If set, will change the Roku TV to use it's AV input
+    [Parameter(ValueFromPipelineByPropertyName,ParameterSetName='launch/tvinput')]
+    [switch]
+    $AVInput,
+
     # A set of additional properties to add to an object
     [Parameter(ValueFromPipelineByPropertyName)]
     [Collections.IDictionary]
@@ -93,8 +114,8 @@
 
     process {
         #region Broadcast Recursively if no -IPAddress was provided
-        if (-not $IPAddress -or 
-            $IPAddress -eq [IPAddress]::Broadcast -or 
+        if (-not $IPAddress -or
+            $IPAddress -eq [IPAddress]::Broadcast -or
             $IPAddress -eq [IPAddress]::Any
         ) {
             if (-not $script:CachedDiscoveredRokus) {
@@ -109,7 +130,7 @@
         }
         $psParameterSet = $PSCmdlet.ParameterSetName
 
-        foreach ($ip in $ipaddress) {
+        :nextIPAddress foreach ($ip in $ipaddress) {
             if ($psParameterSet -eq 'Text') {
                 foreach ($char in $text.ToCharArray()) {
                     $u = [Web.HttpUtility]::UrlEncode("$char")
@@ -118,10 +139,10 @@
                         if ($WhatIfPreference)  {$_ }
                     } }
                 }
-                continue
+                continue nextIPAddress
             }
 
-            if ($psParameterSet -like "Volume*") {                
+            if ($psParameterSet -like "Volume*") {
                 $KeyPress = "$psParameterSet"
                 $psParameterSet = 'keypress'
             }
@@ -134,8 +155,34 @@
                         if ($WhatIfPreference)  {$_ }
                     } }
 
-                continue
+                continue nextIPAddress
             }
+
+            if ($TVTuner -or $Channel) {
+                Send-Roku -Command "$psParameterSet$(if ($Channel) {"?ch=$($channel)"})" -IPAddress $ip -Method POST -Data '' |
+                    & { process {
+                        if ($WhatIfPreference)  {$_ }
+                    } }
+                continue nextIPAddress
+            }
+
+            if ($psParameterSet -eq 'launch/tvinput') {
+                $command = "$psParameterSet"
+
+                if ($AVInput) {
+                    $Command += ".cvbs"
+                } else {
+                    $Command += ".hdmi$($HDMIInput)"
+                }
+                Send-Roku -Command $Command -IPAddress $ip -Method POST -Data '' |
+                    & { process {
+                        if ($WhatIfPreference)  {$_ }
+                    } }
+                continue nextIPAddress
+            }
+
+
+
 
             $splat = @{
                 uri = "http://${ip}:8060/$Command"
@@ -152,7 +199,7 @@
 
             if ($WhatIfPreference) {
                 $splat
-                continue
+                continue nextIPAddress
             }
 
             if (-not $property) { $property = [Ordered]@{}  }
@@ -169,8 +216,8 @@
                 }
             )
 
-            if (! $PSCmdlet.ShouldProcess("$Method $($splat.Uri)")) { return }
-
+            if (! $PSCmdlet.ShouldProcess("$Method $($splat.Uri)")) { continue }
+            if ($WhatIfPreference) { continue nextIPAddress }
             Invoke-RestMethod @splat 2>&1 |
                  & { process {
                     $in = $_
@@ -234,12 +281,12 @@
 
                 $ir.psobject.properties.add($ipNoteProperty)
                 $ir
-            }        
-            
+            }
+
         }
 
 
-        
+
     }
 }
 

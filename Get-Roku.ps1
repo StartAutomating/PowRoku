@@ -44,6 +44,12 @@
     [switch]
     $Screensaver,
 
+    # If set, get Screensavers installed on the Roku.
+    [Parameter(Mandatory,ParameterSetName='query/themes')]
+    [Alias('Themes')]
+    [switch]
+    $Theme,
+
     # If set, will get tv channels from the Roku.
     # This is only supported for Roku TVs.
     [Parameter(Mandatory,ParameterSetName='query/tv-channels')]
@@ -85,7 +91,7 @@
         $isQuery, $thingWeQuery = $PSCmdlet.ParameterSetName -split '/'
         if ($isQuery -eq 'query' -and $thingWeQuery) {
             #region Querying for Data
-            if (-not $IPAddress -or 
+            if (-not $IPAddress -or
                 $IPAddress -eq [IPAddress]::Broadcast) {
                 if (-not $script:CachedDiscoveredRokus) {
                     Find-Roku | Out-Null
@@ -97,7 +103,7 @@
                     return
                 }
             }
-            
+
             foreach ($ip in $IPAddress) {
                 $queryData = Send-Roku -IPAddress $ip -Command $PSCmdlet.ParameterSetName
                 switch ($thingWeQuery) {
@@ -106,6 +112,20 @@
                             Select-Object -ExpandProperty Apps |
                             Select-Object -ExpandProperty App |
                             decorate Roku.App
+                    }
+                    'themes' {
+                        $queryData |
+                            Select-Object -ExpandProperty Themes |
+                            Select-Object -ExpandProperty Theme |
+                            ForEach-Object {
+                                [PSCustomObject][Ordered]@{
+                                    Name = $_.'#text'
+                                    Id   = $_.id
+                                    Selected = if ($_.'selected') { $true } else { $false }
+                                }
+                            } |
+                            decorate Roku.Theme
+
                     }
                     'screensavers' {
                         $queryData |

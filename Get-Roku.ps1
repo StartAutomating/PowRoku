@@ -91,7 +91,7 @@
         $isQuery, $thingWeQuery = $PSCmdlet.ParameterSetName -split '/'
         if ($isQuery -eq 'query' -and $thingWeQuery) {
             #region Querying for Data
-            if (-not $IPAddress -or 
+            if (-not $IPAddress -or
                 $IPAddress -eq [IPAddress]::Broadcast) {
                 if (-not $script:CachedDiscoveredRokus) {
                     Find-Roku | Out-Null
@@ -103,7 +103,7 @@
                     return
                 }
             }
-            
+
             foreach ($ip in $IPAddress) {
                 $queryData = Send-Roku -IPAddress $ip -Command $PSCmdlet.ParameterSetName
                 switch ($thingWeQuery) {
@@ -114,7 +114,7 @@
                             decorate Roku.App
                     }
                     'themes' {
-                        $queryData | 
+                        $queryData |
                             Select-Object -ExpandProperty Themes |
                             Select-Object -ExpandProperty Theme |
                             ForEach-Object {

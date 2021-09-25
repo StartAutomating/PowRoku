@@ -44,6 +44,12 @@
     [switch]
     $Screensaver,
 
+    # If set, get Screensavers installed on the Roku.
+    [Parameter(Mandatory,ParameterSetName='query/themes')]
+    [Alias('Themes')]
+    [switch]
+    $Theme,
+
     # If set, will get tv channels from the Roku.
     # This is only supported for Roku TVs.
     [Parameter(Mandatory,ParameterSetName='query/tv-channels')]
@@ -106,6 +112,20 @@
                             Select-Object -ExpandProperty Apps |
                             Select-Object -ExpandProperty App |
                             decorate Roku.App
+                    }
+                    'themes' {
+                        $queryData | 
+                            Select-Object -ExpandProperty Themes |
+                            Select-Object -ExpandProperty Theme |
+                            ForEach-Object {
+                                [PSCustomObject][Ordered]@{
+                                    Name = $_.'#text'
+                                    Id   = $_.id
+                                    Selected = if ($_.'selected') { $true } else { $false }
+                                }
+                            } |
+                            decorate Roku.Theme
+
                     }
                     'screensavers' {
                         $queryData |
